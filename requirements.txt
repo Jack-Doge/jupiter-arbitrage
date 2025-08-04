@@ -1,0 +1,6 @@
+loguru
+python-dotenv
+requests
+pandas
+numpy
+gate-api

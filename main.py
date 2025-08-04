@@ -104,9 +104,6 @@ class JupiterArbitrageRebalance:
         # 4. 發送Telegram通知
         send_telegram_message(self.tg_bot_token, self.tg_chat_id, msg)
        
-
-arbbot = JupiterArbitrageRebalance()
-arbbot.rebalance()
-
-
-
+if __name__ == "__main__":
+    arbbot = JupiterArbitrageRebalance()
+    arbbot.rebalance()
