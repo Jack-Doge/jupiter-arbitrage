@@ -6,3 +6,12 @@ venv/
 
 # ignore Python cache files
 __pycache__/
+
+# ignore Jupyter Notebook checkpoints
+.vscode/
+
+# ignore conifg
+config.json
+
+# ignore test
+test.py
