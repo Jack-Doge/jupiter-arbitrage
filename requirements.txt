@@ -1,6 +1,8 @@
-loguru
-python-dotenv
-requests
-pandas
-numpy
-gate-api
+gate_api==6.104.3
+loguru==0.7.3
+matplotlib==3.10.5
+numpy==2.3.2
+pandas==2.3.1
+python-dotenv==1.1.1
+python_okx==0.4.0
+Requests==2.32.4

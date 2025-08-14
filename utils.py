@@ -3,39 +3,43 @@ import json
 from loguru import logger
 from dotenv import load_dotenv
 import time
+from datetime import datetime
 import requests
 import pandas as pd
 import numpy as np
 
 import gate_api
+import okx.Account as Account
+import okx.MarketData as Market
+import okx.Trade as Trade
 
 import json
 import os
-import gate_api
 from dotenv import load_dotenv
 
-def setup_gate_client()-> gate_api.FuturesApi:
+def setup_okx_client()-> Account.AccountAPI:
     """設定 Gate.io API 客戶端並處理身份驗證"""
     load_dotenv() 
-    GATE_APIKEY = os.getenv('GATE_APIKEY')
-    GATE_SECRET = os.getenv('GATE_SECRET')
+    OKX_APIKEY = os.getenv('OKX_APIKEY')
+    OKX_SECRET = os.getenv('OKX_SECRET')
+    OKX_PASSPHRASE = os.getenv('OKX_PASSPHRASE')
+    FLAG = json.load(open('config.json', 'r')).get('okx_flag', '1')
+    accountAPI = Account.AccountAPI(api_key=OKX_APIKEY, 
+                                    api_secret_key=OKX_SECRET, 
+                                    passphrase=OKX_PASSPHRASE, 
+                                    flag=FLAG)
+    marketDataAPI = Market.MarketAPI(flag=FLAG)
+    tradeAPI = Trade.TradeAPI(api_key=OKX_APIKEY, 
+                              api_secret_key=OKX_SECRET, 
+                              passphrase=OKX_PASSPHRASE, 
+                              flag=FLAG)
+    return accountAPI, marketDataAPI, tradeAPI
 
-    configuration = gate_api.Configuration(
-        host=json.load(open('config.json', 'r')).get('gate_host_live'), 
-        key=GATE_APIKEY,
-        secret=GATE_SECRET
-    )
-    api_client = gate_api.ApiClient(configuration)
-    api_instance = gate_api.FuturesApi(api_client)
-    return api_instance
 
-
-def fetch_today_gate_price(symbol, api_instance) -> float:
-    """從 Gate.io 獲取指定交易對的今日價格"""
-    res = api_instance.list_futures_tickers(settle=symbol.split('_')[1].lower(), 
-                                            contract=symbol
-                                            )
-    price = res[0].last
+def fetch_today_okx_price(symbol:str, marketDataAPI: Market.MarketAPI) -> float:
+    """從 OKX 獲取指定交易對的今日價格"""
+    res = marketDataAPI.get_ticker(instId=symbol)
+    price = res['data'][0]['last']
     return float(price)
     
 
@@ -70,48 +74,54 @@ def fetch_metamask_balance()-> dict:
     return balance_metrics
 
 
-def fetch_gate_positions_size(api_instance)-> dict:
-    res = api_instance.list_positions(settle='usdt', holding=True, limit=10)
-    gate_positions_size_metrics = {
+def fetch_okx_positions_size(accountAPI: Account.AccountAPI)-> dict:
+    res = accountAPI.get_positions(instType='SWAP')['data']
+    okx_positions_size_metrics = {
         'BTC': 0.0, 
         'ETH': 0.0, 
-        'SOL': 0.00
+        'SOL': 0.0
     }
     for position in res:
-        if position.contract == 'BTC_USDT':
-            gate_positions_size_metrics['BTC'] += position.size * 0.0001
-        elif position.contract == 'ETH_USDT':
-            gate_positions_size_metrics['ETH'] += position.size * 0.01
-        elif position.contract == 'SOL_USDT':
-            gate_positions_size_metrics['SOL'] += position.size
+        if position['instId'] == 'BTC-USDT-SWAP':
+            okx_positions_size_metrics['BTC'] += float(position['pos']) * 0.01
+        elif position['instId'] == 'ETH-USDT-SWAP':
+            okx_positions_size_metrics['ETH'] += float(position['pos']) * 0.1
+        elif position['instId'] == 'SOL-USDT-SWAP':
+            okx_positions_size_metrics['SOL'] += float(position['pos'])
+    
+    return okx_positions_size_metrics
 
-    return gate_positions_size_metrics
 
-
-def place_order(contract: str, size: float, api_instance: gate_api.FuturesApi):
-    """ 在 Gate.io 創建訂單"""
+def place_order(contract: str, size: float, tradeAPI: Trade.TradeAPI):
+    """ 在 OKX 創建訂單"""
     contract_qty_map = {
-        'BTC_USDT': 0.0001,
-        'ETH_USDT': 0.01,
-        'SOL_USDT': 1.0
+        'BTC-USDT-SWAP': 0.01,
+        'ETH-USDT-SWAP': 0.01,
+        'SOL-USDT-SWAP': 0.01
     }
-    futures_order = gate_api.FuturesOrder(
-        contract=contract,
-        size= int(size / contract_qty_map[contract]), 
-        price='0', 
-        tif='ioc'
+    res = tradeAPI.place_order(
+        instId=contract, 
+        tdMode='cross', 
+        side='buy' if size > 0 else 'sell', 
+        ordType='market', 
+        sz=abs(size) * contract_qty_map[contract]
     )
-    res = api_instance.create_futures_order(settle='usdt', futures_order=futures_order)
-    trade = {
-        'contract': res.contract, # type: ignore
-        'size': res.size * contract_qty_map[res.contract], # type: ignore
-        'price': res.fill_price, # type: ignore
-        'status': res.status, # type: ignore
-        'created_at': res.create_time # type: ignore
-    }
-    return trade
+    if res['code'] == '0':
+        order_id = res['data'][0]['ordId']
+    else:
+        logger.error(f"訂單創建失敗: {res['msg']}")
+        return None
+    order_details = tradeAPI.get_order(ordId=order_id, instId=contract)['data'][0]
 
-place_order(contract='BTC_USDT', size=-0.0001, api_instance=setup_gate_client())
+    trade = {
+        'contract': order_details['instId'], 
+        'size': float(order_details['fillSz']) * contract_qty_map[contract] * (10 if 'ETH' in contract else 100 if 'SOL' in contract else 1), 
+        'price': order_details['avgPx'], 
+        'status': order_details['state'],
+        'created_at': datetime.fromtimestamp(int(order_details['cTime']) / 1000).strftime('%Y-%m-%d %H:%M:%S')
+    }
+    print(trade)
+    return trade
 
 
 def setup_telegram_bot()-> tuple:
@@ -133,24 +143,20 @@ def send_telegram_message(bot_token, chat_id, message: str):
     response = requests.post(url, json=payload)
 
     if response.json().get('ok'):
-        logger.success("訊息發送成功！")
+        logger.success("Message sent successfully")
     else:
-        logger.error(f"訊息發送失敗: {response.json().get('description', '未知錯誤')}")
+        logger.error(f"Failed sending message: {response.json().get('description', '未知錯誤')}")
 
 
-
-if __name__ == "__main__":
-    # FETCH_GATE_PRICE
-    # api_instance = setup_gate_client()
-
-    # price_metrics = {
-    #     'btc_price': fetch_today_gate_price('BTC_USDT', api_instance),
-    #     'eth_price': fetch_today_gate_price('ETH_USDT', api_instance),
-    #     'sol_price': fetch_today_gate_price('SOL_USDT', api_instance),
-    #     'jlp_price': fetch_jlp_price(),
-    # }
-    
-    # bot_token, chat_id = setup_telegram_bot()
-    # message = "Hello, this is a test message from Jupiter Arbitrage Bot!"
-    # send_telegram_message(bot_token, chat_id, message)
-    pass
+def margin_call_check(accountAPI: Account.AccountAPI) -> float:
+    """
+    檢查 OKX 帳戶是否有保證金通知。
+    """
+    res = accountAPI.get_positions(instType='SWAP')['data']
+    for position in res:
+        if float(position['mgnRatio']) < 2.0:
+            logger.warning(f"保證金通知: {position['instId']} 的保證金率低於 1.0")
+            return f"🆘保證金通知: {float(position['instId']): .2f} 的保證金率低於 2.0"
+        else: 
+            logger.info("所有持倉的保證金率均正常")
+            return f"✅保證金充足，當前保證金率: {float(position['mgnRatio']): .2f}"
