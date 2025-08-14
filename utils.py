@@ -2,23 +2,14 @@ import os
 import json
 from loguru import logger
 from dotenv import load_dotenv
-import time
 from datetime import datetime
 import requests
-import pandas as pd
-import numpy as np
 
-import gate_api
 import okx.Account as Account
 import okx.MarketData as Market
 import okx.Trade as Trade
 
-import json
-import os
-from dotenv import load_dotenv
-
 def setup_okx_client()-> Account.AccountAPI:
-    """設定 Gate.io API 客戶端並處理身份驗證"""
     load_dotenv() 
     OKX_APIKEY = os.getenv('OKX_APIKEY')
     OKX_SECRET = os.getenv('OKX_SECRET')
