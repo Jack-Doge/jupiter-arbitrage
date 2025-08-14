@@ -45,8 +45,6 @@ python3 main.py
 ## 主要參數說明
 
 - `.env`：
-    - `GATE_APIKEY`、`GATE_SECRET`：Gate.io API 金鑰
-    - `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID`：Telegram Bot 設定
     -   ``` env
         GATE_APIKEY="YOUR_GATE_APIKEY"
         GATE_SECRET="YOUR_GATE_SECRET_KEY"
