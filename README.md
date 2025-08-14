@@ -12,6 +12,7 @@
 
 ```
 config.json         # 配置檔，包含 API host、目標權重、地址等
+.env                # 存放 API_KEY 與 SECRET_KEY
 main.py             # 主程式，負責資產再平衡邏輯
 utils.py            # 工具函式，API 請求、下單、餘額查詢等
 readme.md           # 本說明文件
