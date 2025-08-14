@@ -111,7 +111,6 @@ def place_order(contract: str, size: float, tradeAPI: Trade.TradeAPI):
         'status': order_details['state'],
         'created_at': datetime.fromtimestamp(int(order_details['cTime']) / 1000).strftime('%Y-%m-%d %H:%M:%S')
     }
-    print(trade)
     return trade
 
 
