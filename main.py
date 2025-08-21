@@ -1,5 +1,4 @@
 import json
-from loguru import logger
 import pandas as pd
 import numpy as np
 
@@ -81,58 +80,57 @@ class JupiterOKXArbitrageRebalance:
 
     def rebalance(self):
         """執行資產再平衡"""
-        try:
-            # 1. 獲取當前價格和餘額
-            self.fetch_data()
-            logger.info(f'調整前資產配置:\n'
-                    f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%')
-                    
-            # 2. 計算需要調整的數量 (以JLP為基準，其他資產配合)
-            adjustments = {}
-            for asset, target_weight in self.target_weights.items():
-                if asset == 'JLP':
-                    continue
+        # 1. 獲取當前價格和餘額
+        self.fetch_data()
+        print(f'調整前資產配置:\n'
+                f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%')
+                
+        # 2. 計算需要調整的數量 (以JLP為基準，其他資產配合)
+        adjustments = {}
+        for asset, target_weight in self.target_weights.items():
+            if asset == 'JLP':
+                continue
 
-                target_value = -(self.jlp_value * target_weight)
-                target_qty = target_value / getattr(self, f"{asset.lower()}_price")
-                current_qty = getattr(self, f"{asset.lower()}_qty")
-                adjustments[asset] = int(round((target_qty - current_qty) / self.minimum_order_size.get(asset), 0))
+            target_value = -(self.jlp_value * target_weight)
+            target_qty = target_value / getattr(self, f"{asset.lower()}_price")
+            current_qty = getattr(self, f"{asset.lower()}_qty")
+            adjustments[asset] = int(round((target_qty - current_qty) / self.minimum_order_size.get(asset), 0))
 
-            # 3. 執行調整
-            msg = '🔔JLP Arbitrage Rebalance🔔\n'
-            for asset, adjustment in adjustments.items():
-                if adjustment > 0:
-                    trade = place_order(f"{asset}-USDT-SWAP", adjustment, self.tradeAPI)
-                    msg += f" - 買入 {trade['size']} {asset} \n"
-                elif adjustment < 0:
-                    trade = place_order(f"{asset}-USDT-SWAP", adjustment, self.tradeAPI)
-                    msg += f" - 賣出 {trade['size']} {asset}\n"
-                else:
-                    msg += f" - {asset} 不需要調整\n" 
-            logger.success(f'完成再平衡 \n {msg}')
-            # 4. 更新權重
-            self.fetch_data()
-            msg += f'➡️調整後資產配置\n' \
-                    f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    
-            logger.info(f'調整後資產配置:\n' \
-                    f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
-                    f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%')
+        # 3. 執行調整
+        msg = '🔔JLP Arbitrage Rebalance🔔\n'
+        for asset, adjustment in adjustments.items():
+            if adjustment > 0:
+                trade = place_order(f"{asset}-USDT-SWAP", adjustment, self.tradeAPI)
+                msg += f" - 買入 {trade['size']} {asset} \n"
+            elif adjustment < 0:
+                trade = place_order(f"{asset}-USDT-SWAP", adjustment, self.tradeAPI)
+                msg += f" - 賣出 {trade['size']} {asset}\n"
+            else:
+                msg += f" - {asset} 不需要調整\n" 
+        print(f'完成再平衡 \n {msg}')
+        # 4. 更新權重
+        self.fetch_data()
+        msg += f'➡️調整後資產配置\n' \
+                f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%\n' \
+                
+        print(f'調整後資產配置:\n' \
+                f' - BTC {(self.btc_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - ETH {(self.eth_weight / self.jlp_weight) * 100: .2f}%\n' \
+                f' - SOL {(self.sol_weight / self.jlp_weight) * 100: .2f}%')
 
-            # 5. 檢查保證金餘額
-            msg += margin_call_check(self.accountAPI)
+        # 5. 檢查保證金餘額
+        msg += margin_call_check(self.accountAPI)
 
-            # 6. 發送Telegram通知
-            send_telegram_message(self.tg_bot_token, self.tg_chat_id, msg)
+        # 6. 發送Telegram通知
+        send_telegram_message(self.tg_bot_token, self.tg_chat_id, msg)
 
-        except Exception as e:
-            logger.error(f"發生錯誤: {e}")
-            send_telegram_message(self.tg_bot_token, self.tg_chat_id, f"❗️發生錯誤: {e}")
+        # except Exception as e:
+        #     print.error(f"發生錯誤: {e}")
+        #     send_telegram_message(self.tg_bot_token, self.tg_chat_id, f"❗️發生錯誤: {e}")
 
 
 if __name__ == "__main__":

@@ -133,9 +133,9 @@ def send_telegram_message(bot_token, chat_id, message: str):
     response = requests.post(url, json=payload)
 
     if response.json().get('ok'):
-        logger.success("Message sent successfully")
+        print("Message sent successfully")
     else:
-        logger.error(f"Failed sending message: {response.json().get('description', '未知錯誤')}")
+        print(f"Failed sending message: {response.json().get('description', '未知錯誤')}")
 
 
 def margin_call_check(accountAPI: Account.AccountAPI) -> float:
