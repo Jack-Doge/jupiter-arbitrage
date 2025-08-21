@@ -18,7 +18,7 @@ class JupiterOKXArbitrageRebalance:
     def __init__(self):
         self.accountAPI, self.marketDataAPI, self.tradeAPI = setup_okx_client() 
         self.tg_bot_token, self.tg_chat_id = setup_telegram_bot()
-        self.target_weights = json.load(open('config.json', 'r')).get('target_weights', {})
+        self.target_weights = json.load(open('/home/jupiter-arbitrage/config.json', 'r')).get('target_weights', {})
         self.minimum_order_size = {
             'BTC': 0.0001,
             'ETH': 0.001,

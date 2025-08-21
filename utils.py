@@ -14,7 +14,7 @@ def setup_okx_client()-> Account.AccountAPI:
     OKX_APIKEY = os.getenv('OKX_APIKEY')
     OKX_SECRET = os.getenv('OKX_SECRET')
     OKX_PASSPHRASE = os.getenv('OKX_PASSPHRASE')
-    FLAG = json.load(open('config.json', 'r')).get('okx_flag', '1')
+    FLAG = json.load(open('/home/jupiter_arbitrage/config.json', 'r')).get('okx_flag', '1')
     accountAPI = Account.AccountAPI(api_key=OKX_APIKEY, 
                                     api_secret_key=OKX_SECRET, 
                                     passphrase=OKX_PASSPHRASE, 
@@ -51,7 +51,7 @@ def fetch_jlp_price()-> float:
 
 def fetch_metamask_balance()-> dict:
     """獲取指定地址的 MetaMask 餘額"""
-    address = json.load(open('config.json', 'r')).get('metamask_address')
+    address = json.load(open('/home/jupiter-arbitrage/config.json', 'r')).get('metamask_address')
     url = f"https://lite-api.jup.ag/ultra/v1/balances/{address}"
     payload = {}
     headers = {
